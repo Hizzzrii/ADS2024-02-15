@@ -1,84 +1,140 @@
-//Создайте класс SourceScannerB с методом main,
-//который читает все файлы *.java из каталога src и его подкаталогов.
-//
-//Каталог можно получить так:
-//        String src = System.getProperty("user.dir")
-//                       + File.separator + "src" + File.separator;
-//
-//Файлы, содержащие в тексте @Test или org.junit.Test (тесты)
-//не участвуют в обработке.
-//
-//В каждом тексте файла необходимо:
-//1. Удалить строку package и все импорты за O(n) от длины текста.
-//2. Удалить все комментарии за O(n) от длины текста.
-//3. Удалить все символы с кодом <33 в начале и конце текстов.
-//4. Удалить пустые строки
-//
-//В полученном наборе текстов:
-//1. Рассчитать размер в байтах для полученных текстов
-//   и вывести в консоль
-//   размер и относительный от src путь к каждому из файлов (по одному в строке)
-//2. При выводе сортировать файлы по размеру,
-//   а если размер одинаковый,
-//   то лексикографически сортировать пути
-//
-//Найдите способ корректно обрабатывать ошибки MalformedInputException
-//
-//Все операции не должны ничего менять на дисках (разрешено только чтение)
-//Работа не имеет цели найти плагиат, поэтому не нужно менять коды своих программ.
 package by.it.group310901.ratutskiy.lesson15;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.stream.Stream;
-public class SourceScannerB extends SourceScannerA {
-    protected static void getInformation() throws IOException {
-        ArrayList<String> size_directory = new ArrayList<>();
-        Path src = Path.of(System.getProperty("user.dir")
-                + File.separator + "src" + File.separator);
-        try (Stream<Path> fileTrees = Files.walk(src)) {
-            fileTrees.forEach(
-                    directory -> {
-                        if (directory.toString().endsWith(".java")) {
-                            try {
-                                char[] charArr;
-                                String str = Files.readString(directory);
-                                if (!str.contains("@Test") && !str.contains("org.junit.Test")) {
-                                    str = str.replaceAll("package.*;", "")
-                                            .replaceAll("import.*;", "");
-                                    str = str.replaceAll("/\\*[\\w\\W\r\n\t]*?\\*/", "")
-                                        .replaceAll("//.*?\r\n\\s*", "");
-                                    while (str.contains("\r\n\r\n"))
-                                        str = str.replaceAll("\r\n\r\n", "\r\n");
-                                    if (!str.isEmpty() && (str.charAt(0) < 33 || str.charAt(str.length() - 1) < 33)) {
-                                        charArr = str.toCharArray();
-                                        int indexF = 0, indexL = charArr.length - 1;
-                                        while (indexF < charArr.length && charArr[indexF] < 33 && charArr[indexF] != 0)
-                                            charArr[indexF++] = 0;
-                                        while (indexL >= 0 && charArr[indexL] < 33 && charArr[indexL] != 0)
-                                            charArr[indexL--] = 0;
-                                        str = new String(move(charArr));
-                                    }
-                                    size_directory.add(str.getBytes().length + " " + src.relativize(directory));
-                                }
-                            } catch (IOException e) {
-                                if (System.currentTimeMillis() < 0) {
-                                    System.err.println(directory);
-                                }
-                            }
-                        }
-                    }
-            );
-            Collections.sort(size_directory, new myStringComparator());
-            for (var info : size_directory)
-                System.out.println(info);
+import java.nio.file.Paths;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+
+public class SourceScannerB {
+
+    public static void main(String[] args) {
+        String src = System.getProperty("user.dir") + File.separator + "src" + File.separator;
+
+        try {
+            List<FileData> results = Files.walk(Paths.get(src))
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".java"))
+                    .map(Path::toFile)
+                    .map(SourceScannerB::processFile)
+                    .filter(Objects::nonNull)
+                    .sorted(Comparator
+                            .comparingInt(FileData::getSize)
+                            .thenComparing(FileData::getRelativePath))
+                    .toList();
+
+            results.forEach(result ->
+                    System.out.println(result.getSize() + " " + result.getRelativePath()));
+
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
-    public static void main(String[] args) throws IOException {
-        getInformation();
+
+    private static FileData processFile(File file) {
+        try {
+            String content = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+
+            if (content.contains("@Test") || content.contains("org.junit.Test")) {
+                return null;
+            }
+            content = removePackageAndImports(content);
+            content = removeComments(content);
+            content = cleanText(content);
+
+            int size = content.getBytes(StandardCharsets.UTF_8).length;
+
+            String relativePath = file.getPath().replace(System.getProperty("user.dir") + File.separator, "");
+
+            return new FileData(size, relativePath);
+
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private static String removePackageAndImports(String content) {
+        String[] lines = content.split("\n");
+        StringBuilder result = new StringBuilder();
+
+        for (String line : lines) {
+            String trimmedLine = line.trim();
+            if (!trimmedLine.startsWith("package") && !trimmedLine.startsWith("import")) {
+                result.append(line).append("\n");
+            }
+        }
+        return result.toString();
+    }
+
+    private static String removeComments(String content) {
+        StringBuilder result = new StringBuilder();
+        boolean inBlockComment = false;
+
+        for (int i = 0; i < content.length(); i++) {
+            if (i < content.length() - 1 && content.charAt(i) == '/' && content.charAt(i + 1) == '*') {
+                inBlockComment = true;
+                i++;
+            } else if (inBlockComment && i < content.length() - 1 && content.charAt(i) == '*' && content.charAt(i + 1) == '/') {
+                inBlockComment = false;
+                i++;
+            } else if (inBlockComment) {
+                continue;
+            }
+            else if (i < content.length() - 1 && content.charAt(i) == '/' && content.charAt(i + 1) == '/') {
+                while (i < content.length() && content.charAt(i) != '\n') {
+                    i++;
+                }
+            } else {
+                result.append(content.charAt(i));
+            }
+        }
+        return result.toString();
+    }
+
+    private static String cleanText(String content) {
+        String[] lines = content.split("\n");
+        StringBuilder result = new StringBuilder();
+
+        for (String line : lines) {
+            String trimmedLine = line.trim();
+            if (!trimmedLine.isEmpty()) {
+                result.append(trimmedLine).append("\n");
+            }
+        }
+
+        int start = 0, end = result.length();
+
+        while (start < end && result.charAt(start) < 33) {
+            start++;
+        }
+
+        while (end > start && result.charAt(end - 1) < 33) {
+            end--;
+        }
+
+        return result.substring(start, end);
+    }
+
+    private static class FileData {
+        private final int size;
+        private final String relativePath;
+
+        public FileData(int size, String relativePath) {
+            this.size = size;
+            this.relativePath = relativePath;
+        }
+
+        public int getSize() {
+            return size;
+        }
+
+        public String getRelativePath() {
+            return relativePath;
+        }
     }
 }
+
