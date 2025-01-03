@@ -16,7 +16,7 @@ public class Test_Part2_Lesson15Test extends HomeWork {
     private static List<String> samples;
 
     @Test(timeout = 5000) //можно изменить под свою производительность
-    public void testSourceScannerA() {
+    public void taskA() {
         HomeWork run = run("");
         for (String sample : lazyWalk()) {
             run.include(sample);
@@ -24,7 +24,7 @@ public class Test_Part2_Lesson15Test extends HomeWork {
     }
 
     @Test(timeout = 5000) //можно изменить под свою производительность
-    public void testSourceScannerB() {
+    public void taskB() {
         HomeWork run = run("");
         for (String sample : lazyWalk()) {
             run.include(sample);
@@ -33,7 +33,7 @@ public class Test_Part2_Lesson15Test extends HomeWork {
 
 
     @Test(timeout = 5000) //можно изменить под свою производительность
-    public void testSourceScannerC() {
+    public void taskC() {
         run("").include("FiboA.java");
     }
 
