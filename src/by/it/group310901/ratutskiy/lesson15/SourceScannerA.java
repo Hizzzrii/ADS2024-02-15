@@ -1,116 +1,108 @@
+//Создайте класс SourceScannerA с методом main,
+//который читает все файлы *.java из каталога src и его подкаталогов.
+//
+//Каталог можно получить так:
+//        String src = System.getProperty("user.dir")
+//                       + File.separator + "src" + File.separator;
+//
+//Файлы, содержащие в тексте @Test или org.junit.Test (тесты)
+//не участвуют в обработке.
+//
+//В каждом тексте файла необходимо:
+//1. Удалить строку package и все импорты за O(n).
+//2. Удалить все символы с кодом <33 в начале и конце текстов.
+//
+//В полученном наборе текстов:
+//1. Рассчитать размер в байтах для полученных текстов
+//   и вывести в консоль
+//   размер и относительный от src путь к каждому из файлов (по одному в строке)
+//2. При выводе сортировать файлы по размеру,
+//   а если размер одинаковый,
+//   то лексикографически сортировать пути
+//
+//Найдите способ игнорировать ошибки MalformedInputException
+//
+//Все операции не должны ничего менять на дисках (разрешено только чтение)
+//Работа не имеет цели найти плагиат, поэтому не нужно менять коды своих программ.
 package by.it.group310901.ratutskiy.lesson15;
-
-import java.io.*;
-import java.nio.file.*;
-import java.nio.charset.*;
-import java.util.*;
-import java.util.stream.*;
-
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Scanner;
+import java.util.stream.Stream;
 public class SourceScannerA {
-
-    public static void main(String[] args) {
-        // Получаем путь к директории src в текущем рабочем каталоге
-        String src = System.getProperty("user.dir") + File.separator + "src" + File.separator;
-
-        try {
-            // Проходим по всем файлам в директории src и обрабатываем их
-            List<FileData> results = Files.walk(Paths.get(src))
-                    .filter(Files::isRegularFile) // Оставляем только обычные файлы
-                    .filter(path -> path.toString().endsWith(".java")) // Оставляем только файлы с расширением .java
-                    .map(Path::toFile) // Преобразуем Path в File
-                    .map(SourceScannerA::processFile) // Обрабатываем файл
-                    .filter(Objects::nonNull) // Исключаем файлы, для которых processFile вернул null
-                    .sorted(Comparator
-                            .comparingInt(FileData::getSize) // Сортируем по размеру файла
-                            .thenComparing(FileData::getRelativePath)) // Затем по относительному пути
-                    .toList(); // Преобразуем Stream в List
-
-            // Выводим результаты в консоль
-            results.forEach(result ->
-                    System.out.println(result.getSize() + " " + result.getRelativePath()));
-
-        } catch (IOException e) {
-            e.printStackTrace(); // Обработка исключений ввода-вывода
-        }
-    }
-
-    // Метод для обработки каждого файла
-    private static FileData processFile(File file) {
-        try {
-            // Читаем содержимое файла
-            String content = Files.readString(file.toPath(), StandardCharsets.UTF_8);
-
-            // Проверяем, содержит ли файл аннотации тестов, если да, возвращаем null
-            if (content.contains("@Test") || content.contains("org.junit.Test")) {
-                return null;
+    protected static class myStringComparator implements Comparator<String>{
+        @Override
+        public int compare(String s1, String s2) {
+            int int_s1, int_s2;
+            int_s1 = new Scanner(s1).nextInt(10);
+            int_s2 = new Scanner(s2).nextInt(10);
+            if (int_s1 == int_s2) {
+                return s1.compareTo(s2);
             }
-
-            // Удаляем объявления пакетов и импортов
-            content = removePackageAndImports(content);
-            // Обрезаем управляющие символы
-            content = trimControlCharacters(content);
-
-            // Получаем размер содержимого в байтах
-            int size = content.getBytes(StandardCharsets.UTF_8).length;
-
-            // Получаем относительный путь к файлу
-            String relativePath = file.getPath().replace(System.getProperty("user.dir") + File.separator, "");
-
-            // Возвращаем новый объект FileData с размером и относительным путем
-            return new FileData(size, relativePath);
-
-        } catch (IOException e) {
-            return null; // В случае ошибки чтения файла возвращаем null
+            return int_s1 > int_s2 ? 1 : -1;
         }
     }
-
-    // Метод для удаления строк с объявлением пакета и импортов
-    private static String removePackageAndImports(String content) {
-        String[] lines = content.split("\n"); // Разбиваем содержимое на строки
-        StringBuilder result = new StringBuilder();
-
-        for (String line : lines) {
-            String trimmedLine = line.trim(); // Убираем пробелы в начале и конце
-            // Если строка не начинается с package или import, добавляем ее в результат
-            if (!trimmedLine.startsWith("package") && !trimmedLine.startsWith("import")) {
-                result.append(line).append("\n");
-            }
-        }
-        return result.toString(); // Возвращаем очищенное содержимое
+    protected static char[] move(char[] array) {
+        char[] temp;
+        int i = 0, size;
+        while(array[i] == 0)
+            i++;
+        size = array.length - i;
+        temp = new char[size];
+        System.arraycopy(array, i, temp, 0, size);
+        array = temp;
+        i = array.length - 1;
+        while (array[i] == 0)
+            i--;
+        size = i + 1;
+        temp = new char[size];
+        System.arraycopy(array, 0, temp, 0, size);
+        return temp;
     }
-
-    // Метод для удаления управляющих символов из начала и конца содержимого
-    private static String trimControlCharacters(String content) {
-        int start = 0, end = content.length();
-
-        // Увеличиваем start, пока не дойдем до первого допустимого символа
-        while (start < end && content.charAt(start) < 33) {
-            start++;
+    private static void getInformation() throws IOException {
+        ArrayList<String> size_directory = new ArrayList<>();
+        Path src = Path.of(System.getProperty("user.dir")
+                + File.separator + "src" + File.separator);
+        try (Stream<Path> fileTrees = Files.walk(src)) {
+            fileTrees.forEach(
+                    directory -> {
+                        if (directory.toString().endsWith(".java")) {
+                            try {
+                                char[] charArr;
+                                String str = Files.readString(directory);
+                                if (!str.contains("@Test") && !str.contains("org.junit.Test")) {
+                                    str = str.replaceAll("package.+;", "")
+                                            .replaceAll("import.+;", "");
+                                    if (!str.isEmpty() && (str.charAt(0) < 33 || str.charAt(str.length() - 1) < 33)) {
+                                        charArr = str.toCharArray();
+                                        int indexF = 0, indexL = charArr.length - 1;
+                                        while (indexF < charArr.length && charArr[indexF] < 33 && charArr[indexF] != 0)
+                                            charArr[indexF++] = 0;
+                                        while (indexL >= 0 && charArr[indexL] < 33 && charArr[indexL] != 0)
+                                            charArr[indexL--] = 0;
+                                        str = new String(move(charArr));
+                                    }
+                                    size_directory.add(str.getBytes().length + " " + src.relativize(directory));
+                                }
+                            } catch (IOException e) {
+                                if (System.currentTimeMillis() < 0) {
+                                    System.err.println(directory);
+                                }
+                            }
+                        }
+                    }
+            );
+            Collections.sort(size_directory, new myStringComparator());
+            for (var info : size_directory)
+                System.out.println(info);
         }
-        // Уменьшаем end, пока не дойдем до последнего допустимого символа
-        while (end > start && content.charAt(end - 1) < 33) {
-            end--;
-        }
-
-        return content.substring(start, end); // Возвращаем обрезанное содержимое
     }
-
-    // Класс для хранения информации о файле
-    private static class FileData {
-        private final int size; // Размер файла
-        private final String relativePath; // Относительный путь к файлу
-
-        public FileData(int size, String relativePath) {
-            this.size = size;
-            this.relativePath = relativePath;
-        }
-
-        public int getSize() {
-            return size; // Метод для получения размера файла
-        }
-
-        public String getRelativePath() {
-            return relativePath; // Метод для получения относительного пути
-        }
+    public static void main(String[] args) throws IOException {
+        getInformation();
     }
 }
